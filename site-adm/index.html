@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Montagem - Admin</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#4361ee">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- FIREBASE (VERSÃO COMPATÍVEL) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    
+    <style>
+        /* RESET E ESTILOS BÁSICOS */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fb;
+            color: #333;
+        }
+        
+        /* LOADING SCREEN */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #4361ee, #7209b7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 9999;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .logo-loading {
+            margin-bottom: 30px;
+        }
+        
+        .logo-loading i {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .logo-loading h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .logo-loading p {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px 0;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #status-text {
+            font-size: 1.1rem;
+            margin: 10px 0;
+            min-height: 24px;
+        }
+        
+        #firebase-status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .progress-steps {
+            margin-top: 20px;
+            text-align: left;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+        
+        .step.active {
+            opacity: 1;
+        }
+        
+        .step-number {
+            width: 25px;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 0.8rem;
+        }
+        
+        .step.active .step-number {
+            background: #4cc9f0;
+        }
+        
+        /* APP CONTENT */
+        #app {
+            display: none;
+            min-height: 100vh;
+        }
+        
+        /* LOGIN SCREEN */
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #4361ee, #7209b7);
+        }
+        
+        .login-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .login-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .login-logo i {
+            font-size: 3rem;
+            color: #4361ee;
+            margin-bottom: 1rem;
+        }
+        
+        .login-logo h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-logo p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #4361ee;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 0.9rem;
+            background: #4361ee;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-login:hover {
+            background: #3a56d4;
+        }
+        
+        .login-info {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #4361ee;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .login-info p {
+            margin-bottom: 0.3rem;
+        }
+        
+        /* NOTIFICAÇÕES */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            z-index: 10000;
+            animation: slideInRight 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            max-width: 400px;
+        }
+        
+        .notification.success {
+            background: #4cc9f0;
+        }
+        
+        .notification.error {
+            background: #f94144;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        /* BOTÃO DE EMERGÊNCIA */
+        #emergency-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #f94144;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            display: none;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(249, 65, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- LOADING SCREEN -->
+    <div id="loading">
+        <div class="logo-loading">
+            <i class="fas fa-bed"></i>
+            <h1>Montagem Premium</h1>
+            <p>Sistema Administrativo</p>
+        </div>
+        
+        <div class="spinner"></div>
+        
+        <div id="status-text">Inicializando sistema...</div>
+        
+        <div id="firebase-status">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Conectando ao Firebase...</span>
+        </div>
+        
+        <div class="progress-steps">
+            <div class="step" id="step1">
+                <div class="step-number">1</div>
+                <div>Carregando Firebase</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div>Conectando ao banco de dados</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div>Verificando autenticação</div>
+            </div>
+            <div class="step" id="step4">
+                <div class="step-number">4</div>
+                <div>Carregando interface</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- APP CONTENT -->
+    <div id="app">
+        <!-- LOGIN SCREEN -->
+        <div class="login-screen">
+            <div class="login-box">
+                <div class="login-logo">
+                    <i class="fas fa-bed"></i>
+                    <h1>Montagem Premium</h1>
+                    <p>Sistema Administrativo</p>
+                </div>
+                
+                <form id="login-form">
+                    <div class="input-group">
+                        <label for="email"><i class="fas fa-user"></i> E-mail</label>
+                        <input type="email" id="email" value="admin@montagem.com" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="password"><i class="fas fa-lock"></i> Senha</label>
+                        <input type="password" id="password" value="admin123" required>
+                    </div>
+                    
+                    <div id="login-error" style="
+                        background: #f8d7da;
+                        color: #721c24;
+                        padding: 10px;
+                        border-radius: 5px;
+                        margin-bottom: 1rem;
+                        display: none;
+                    "></div>
+                    
+                    <button type="submit" class="btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Entrar no Sistema
+                    </button>
+                    
+                    <div class="login-info">
+                        <p><strong>Para teste rápido:</strong></p>
+                        <p>E-mail: admin@montagem.com</p>
+                        <p>Senha: admin123</p>
+                        <p style="margin-top: 10px; font-size: 0.8rem;">
+                            <i class="fas fa-info-circle"></i>
+                            Se não funcionar, crie este usuário no Firebase Console
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- BOTÃO DE EMERGÊNCIA -->
+    <button id="emergency-btn" onclick="skipFirebase()">
+        <i class="fas fa-bolt"></i> Pular Firebase
+    </button>
+
+    <!-- FIREBASE CONFIG -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- APP SCRIPT -->
+    <script>
+        console.log("📱 Iniciando aplicação...");
+        
+        // VARIÁVEIS
+        let currentUser = null;
+        let firebaseInitialized = false;
+        
+        // ELEMENTOS
+        const loadingEl = document.getElementById('loading');
+        const appEl = document.getElementById('app');
+        const statusText = document.getElementById('status-text');
+        const emergencyBtn = document.getElementById('emergency-btn');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        
+        // FUNÇÕES DE NOTIFICAÇÃO
+        function showNotification(message, type = 'info') {
+            // Remover notificação anterior
+            const existing = document.querySelector('.notification');
+            if (existing) existing.remove();
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                                 type === 'error' ? 'exclamation-circle' : 
+                                 'info-circle'}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remover após 5 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+        
+        // ATUALIZAR ESTADOS DO LOADING
+        function updateStep(stepNumber) {
+            // Resetar todos
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById('step' + i);
+                if (step) step.classList.remove('active');
+            }
+            
+            // Ativar passo atual
+            const currentStep = document.getElementById('step' + stepNumber);
+            if (currentStep) currentStep.classList.add('active');
+        }
+        
+        // ATUALIZAR STATUS
+        function updateStatus(text) {
+            console.log("📢 Status:", text);
+            if (statusText) {
+                statusText.textContent = text;
+            }
+        }
+        
+        // PULAR FIREBASE (MODO OFFLINE)
+        function skipFirebase() {
+            updateStatus("Ativando modo offline...");
+            firebaseInitialized = true;
+            showApp();
+        }
+        
+        // MOSTRAR APP
+        function showApp() {
+            console.log("🎉 Mostrando aplicação...");
+            
+            // Esconder loading
+            loadingEl.style.opacity = '0';
+            loadingEl.style.transition = 'opacity 0.5s';
+            
+            setTimeout(() => {
+                loadingEl.style.display = 'none';
+                appEl.style.display = 'block';
+                emergencyBtn.style.display = 'none';
+                
+                updateStatus("Sistema pronto!");
+                updateStep(4);
+                
+                // Iniciar sistema
+                initializeApp();
+            }, 500);
+        }
+        
+        // INICIALIZAR APP
+        function initializeApp() {
+            console.log("🚀 Inicializando aplicação...");
+            
+            // Configurar formulário de login
+            if (loginForm) {
+                loginForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    
+                    // Mostrar carregando
+                    updateStatus("Fazendo login...");
+                    
+                    if (firebaseInitialized && window.firebaseAuth) {
+                        // Tentar login com Firebase
+                        try {
+                            const userCredential = await window.firebaseAuth.signInWithEmailAndPassword(email, password);
+                            const user = userCredential.user;
+                            
+                            console.log("✅ Login realizado:", user.email);
+                            
+                            // Mostrar notificação
+                            showNotification("✅ Login realizado com sucesso! Redirecionando...", "success");
+                            
+                            // Redirecionar para dashboard após 1.5 segundos
+                            setTimeout(() => {
+                                window.location.href = "Dashboard.html";
+                            }, 1500);
+                            
+                            loginError.style.display = 'none';
+                            
+                        } catch (error) {
+                            console.error("❌ Erro no login:", error);
+                            
+                            let errorMessage = "Erro ao fazer login";
+                            
+                            switch(error.code) {
+                                case 'auth/user-not-found':
+                                    errorMessage = "Usuário não encontrado";
+                                    break;
+                                case 'auth/wrong-password':
+                                    errorMessage = "Senha incorreta";
+                                    break;
+                                case 'auth/invalid-email':
+                                    errorMessage = "Email inválido";
+                                    break;
+                                case 'auth/too-many-requests':
+                                    errorMessage = "Muitas tentativas. Tente novamente mais tarde";
+                                    break;
+                                default:
+                                    errorMessage = error.message;
+                            }
+                            
+                            loginError.textContent = errorMessage;
+                            loginError.style.display = 'block';
+                            
+                            showNotification("❌ " + errorMessage, "error");
+                        } finally {
+                            updateStatus("Pronto");
+                        }
+                    } else {
+                        // Modo offline - login simulado
+                        if (email === 'admin@montagem.com' && password === 'admin123') {
+                            showNotification("✅ Login realizado (modo offline)!", "success");
+                            loginError.style.display = 'none';
+                            
+                            // Redirecionar para dashboard
+                            setTimeout(() => {
+                                window.location.href = "Dashboard.html";
+                            }, 1500);
+                        } else {
+                            loginError.textContent = "Credenciais inválidas. Use admin@montagem.com / admin123";
+                            loginError.style.display = 'block';
+                            showNotification("❌ Credenciais inválidas", "error");
+                        }
+                    }
+                });
+            }
+        }
+        
+        // ESCUTAR EVENTO DO FIREBASE
+        window.addEventListener('firebaseReady', function() {
+            console.log("🎯 Evento firebaseReady recebido!");
+            firebaseInitialized = true;
+            updateStatus("Firebase configurado com sucesso!");
+            updateStep(3);
+            
+            // Mostrar app após breve delay
+            setTimeout(showApp, 1000);
+        });
+        
+        // MOSTRAR BOTÃO DE EMERGÊNCIA APÓS 10 SEGUNDOS
+        setTimeout(() => {
+            if (!firebaseInitialized) {
+                emergencyBtn.style.display = 'block';
+                updateStatus("Carregamento demorado. Clique no botão vermelho para continuar.");
+                updateStep(2);
+            }
+        }, 10000);
+        
+        // INICIAR QUANDO DOCUMENTO CARREGAR
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("📄 Documento carregado");
+            updateStatus("Sistema iniciando...");
+            updateStep(1);
+            
+            // Mostrar botão de emergência mais cedo se necessário
+            setTimeout(() => {
+                if (!firebaseInitialized && emergencyBtn.style.display === 'none') {
+                    emergencyBtn.style.display = 'block';
+                }
+            }, 5000);
+        });
+        
+        // VERIFICAR FIREBASE A CADA 2 SEGUNDOS
+        const checkFirebaseInterval = setInterval(() => {
+            if (window.firebaseReady && !firebaseInitialized) {
+                console.log("✅ Firebase detectado via polling");
+                clearInterval(checkFirebaseInterval);
+                
+                // Disparar evento manualmente
+                const event = new Event('firebaseReady');
+                window.dispatchEvent(event);
+            }
+        }, 2000);
+        
+        // LIMPAR INTERVALO APÓS 30 SEGUNDOS
+        setTimeout(() => {
+            clearInterval(checkFirebaseInterval);
+        }, 30000);
+        
+        console.log("✅ Sistema de carregamento configurado!");
+    </script>
+    <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js")
+        .then(() => console.log("✅ PWA ativo"))
+        .catch(err => console.error("❌ SW erro:", err));
+    });
+  }
+</script>
+
+</body>
+</html>
